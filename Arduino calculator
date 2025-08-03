@@ -1,0 +1,810 @@
+#include <LiquidCrystal.h>
+#include <Keypad.h>
+#include<math.h>//------------------------------------------
+const byte ROWS = 4; //four rows
+const byte COLS = 4; //four columns
+//define the cymbols on the buttons of the keypads
+char hexaKeys[ROWS][COLS] = {
+  {'1','2','3','+'},
+  {'4','5','6','-'},
+  {'7','8','9','*'},
+  {'D','0','M','='}//==------------------------------
+};
+char decaKeys[ROWS][COLS] = {
+  {'/','^','!','S'},
+  {'C','T',')','('},//------------------------------------
+  {'Y','L','l','R'},
+  {'D','K','M','.'}
+  };
+char kecaKeys[ROWS][COLS] = {
+  {'A','s','o','t'},
+  {'c','p','e','P'},
+  {'>','i','n','y'},
+  {'D','K','M','r'}
+};
+char mecaKeys[ROWS][COLS] = {
+  {'[',']','{','}'},
+  {'X','x','A','>'},
+  {'X','c','P','<'},
+  {'D','K','M',' '}
+};
+byte rowPins[ROWS] = {A0,A1,A2,A3}; //connect to the row pinouts of the keypad
+byte colPins[COLS] = {7, 6, 5, 4}; //connect to the column pinouts of the keypad
+
+//initialize an instance of class NewKeypad
+Keypad customKeypad = Keypad( makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS); 
+Keypad customKeypad_2 = Keypad(makeKeymap(decaKeys),rowPins,colPins,ROWS,COLS);
+Keypad customKeypad_3 = Keypad(makeKeymap(kecaKeys),rowPins,colPins,ROWS,COLS);
+Keypad customKeypad_4 = Keypad(makeKeymap(mecaKeys),rowPins,colPins,ROWS,COLS);
+// LCD pins: RS, EN, D4, D5, D6, D7
+LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
+
+// Keypad configuration
+bool gap_state = true;
+bool matrix_error_state = false;
+bool matrix_state = false;
+bool kade_state = false;
+bool error_occured = false;
+bool  made_state = false;
+bool  full_state = false;
+bool radian_state = true;
+double answer =0;
+// Simple buffers
+bool resultDisplayed = false;
+class owner{
+  private:
+  String own;
+  int current ;
+  int capacity ;
+  public:
+   
+   owner()
+   {
+      own = "";
+      current =0;
+      capacity = 0;
+   }
+  void push(char data)
+  {
+    if (capacity>current)
+    {
+      own[current++] = data;
+    }
+    else
+    {own += data;
+    current++;
+    capacity = current;}
+  }
+  void pop()
+  {
+    current--;
+    if (current<0)
+    {
+        current = 0;
+    }
+  }
+  void replace_at_index(int value,char data)
+  {
+    if(value>=0&&value<current)
+    {
+        own[value] = data;
+    }
+  }
+  void push_at_index(int index,char data)
+  {
+    if (index>=0&& index<current)
+    {
+      push(" ");
+      for(int i = size()-1;i>index;i--)
+      {
+        own[i] = own[i-1];
+      }
+      own[index] = data;
+    }
+  }
+  void pop_at_index(int index)
+  {
+    if (index>=0&& index<current)
+    {
+      for(int i = index+1;i<current;i++)
+      {
+        own[i-1] = own[i];
+      }
+      pop();
+    }
+
+  }
+  int size()
+  {
+    return current;
+  }
+  char back()
+  {
+    return own[current-1];
+  }
+  String return_at_index(int index_start,int index_end)
+  {
+    if(index_start<current){String temp = own.substring(index_start,index_end);
+    return temp;}
+  }
+  void clear()
+  {
+    own = "";
+    current = 0;
+    capacity = current;
+  }
+  String all_return()
+  {
+    String temp = "";
+    temp = own.substring(0,current);
+    return temp;
+  }
+  void take_all(String giver)
+  {
+    own = giver;
+  }
+  int find(char data)
+  {
+    for(int i = 0;i<current;i++)
+    {
+      if (own[i] == data)
+      {
+        return i;
+      }
+    }
+    return -1;
+  }
+ 
+};
+
+
+owner expression;
+void setup() {
+  // put your setup code here, to run once:
+for (byte i = 0; i < 4; i++) {
+    pinMode(rowPins[i], OUTPUT);
+    digitalWrite(rowPins[i], HIGH);
+    pinMode(colPins[i], INPUT_PULLUP);
+  }
+lcd.begin(20,4);
+  lcd.setCursor(3, 1);
+  lcd.print("CALCULATOR");
+  delay(2000);
+  lcd.clear();
+  lcd.setCursor(0,3);
+  lcd.print((radian_state==true?"Rad":"Deg"));
+  lcd.setCursor(0,0);
+  lcd.blink();
+  
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+char key = (made_state == false && kade_state == false?customKeypad.getKey():(made_state == true && kade_state == false?customKeypad_2.getKey():(made_state == false && kade_state == true?customKeypad_3.getKey():customKeypad_4.getKey())));
+  if (key != '\0') {
+    handleKeyPress(key);
+  }
+}
+
+void handleKeyPress(char key) {
+  lcd.noBlink();
+  if (resultDisplayed && key != 'D') {//---------------------
+    lcd.clear();
+    expression.clear();
+    resultDisplayed = false;
+    lcd.setCursor(0,3);
+    lcd.print((radian_state==true?"Rad":"Deg"));
+  }
+
+  if (key == 'D') {//--------------------------------
+    lcd.clear();
+    if(made_state == true)
+    {
+      lcd.setCursor(16,3);
+      lcd.print("Mode");
+    }
+    if(kade_state == true)
+    {
+      lcd.setCursor(12, 3);
+    lcd.print("key");
+    }
+    lcd.setCursor(0,3);
+    lcd.print((radian_state==true?"Rad":"Deg"));
+    if(resultDisplayed==true)resultDisplayed = false;
+    if(expression.size()>40)
+    {
+      full_state = true;
+    }
+    if (full_state == true)
+    {
+        expression.pop();
+         lcd.setCursor(0, 0);
+    lcd.print(expression.return_at_index(0,20));
+    lcd.setCursor(0,1);
+    lcd.print(expression.return_at_index(20,40));
+    lcd.setCursor(0,2);
+    if (expression.size()>40)
+      {//---------------------------------------------------------
+        lcd.print(expression.return_at_index(40,expression.size()));}
+    lcd.blink();
+    full_state = false;
+    }
+    else
+    {  expression.pop();
+      lcd.setCursor(0,0);
+      lcd.print(expression.all_return());
+      lcd.blink();}
+    return;
+  }
+
+  if (key == '=') {
+    
+    double result = evaluateExpression(expression.all_return());
+    lcd.clear();
+    if(error_occured)
+    {
+      lcd.setCursor(0,0);
+      lcd.print("Error NAN");
+      error_occured = false;
+      return;
+    }
+    lcd.print("Result:");
+    lcd.setCursor(0, 1);
+    lcd.print(result, 4);
+    resultDisplayed = true;
+    return;
+  }
+
+  if(key == 'Y')
+  {
+    lcd.clear();
+    if(made_state == true)
+    {
+      lcd.setCursor(16,3);
+      lcd.print("Mode");
+    }
+    lcd.setCursor(0,3);
+    lcd.print((radian_state==true?"Rad":"Deg"));
+    expression.clear();
+    lcd.setCursor(0,0);
+    lcd.blink();
+    return;//----------------------------------
+  }
+
+  if(key == 'R')
+  {
+    radian_state = !radian_state;
+    lcd.setCursor(0,3);
+    lcd.print((radian_state==true?"Rad":"Deg"));
+    return;
+  }  
+
+  if (key == 'M')
+  {//-----------------------------------------
+    lcd.setCursor(0,3);
+    lcd.print((radian_state==true?"Rad":"Deg"));
+    made_state = !made_state;
+    lcd.setCursor(16,3);
+    lcd.print((made_state == true?"Mode":"    "));
+    lcd.setCursor(12, 3);
+    lcd.print((kade_state == true?"Key":"   "));
+    return;
+  }
+
+  if(key == 'K')
+  {
+    lcd.setCursor(0,3);
+    lcd.print((radian_state==true?"Rad":"Deg"));
+    lcd.setCursor(16,3);
+    lcd.print((made_state == true?"Mode":"    "));
+    kade_state = !kade_state;
+    lcd.setCursor(12, 3);
+    lcd.print((kade_state == true?"Key":"   "));
+    return;
+  }
+  if (expression.size() <= 19*2) {
+    lcd.clear();
+    lcd.setCursor(0,3);
+    lcd.print((radian_state==true?"Rad":"Deg"));
+    if(made_state == true)
+    {
+      lcd.setCursor(16,3);
+      lcd.print("Mode");
+    }
+    if(kade_state == true)
+    {
+      lcd.setCursor(12, 3);
+    lcd.print("key");
+    }
+    expression.push(key);
+    lcd.setCursor(0, 0);
+    lcd.print(expression.all_return());
+    lcd.blink();
+    
+  } 
+
+  else if(expression.size() >= 19*2+1 && expression.size()<=19*3)
+  {
+    lcd.clear();
+    if(made_state == true)
+    {
+      lcd.setCursor(16,3);
+      lcd.print("Mode");
+    }
+    if(kade_state == true)
+    {
+      lcd.setCursor(12, 3);
+    lcd.print("key");
+    }
+    lcd.setCursor(0,3);
+    lcd.print((radian_state==true?"Rad":"Deg"));
+    expression.push(key);
+    lcd.setCursor(0, 0);
+    lcd.print(expression.return_at_index(0,20));
+    lcd.setCursor(0,1);
+    lcd.print(expression.return_at_index(20,40));
+    lcd.setCursor(0,2);
+    if (expression.size()>40)
+      {
+        lcd.print(expression.return_at_index(40,expression.size()));}
+    lcd.blink();
+    
+  } 
+
+  else
+  {
+    lcd.setCursor(0,3);
+    lcd.print((radian_state==true?"Rad":"Deg"));
+    lcd.setCursor(3,3);
+    lcd.print("MAX LENGTH");
+  }
+}
+
+
+
+double evaluateExpression(String exp) {
+  exp = remove_constant(exp);//----------------------
+  exp = removeBrackets_2(exp);
+  exp = removeBrackets_1(exp);
+  exp = removeBrackets(exp);
+  exp = remove_extra_bracket(exp);
+  if(error_occured == true){//--------------------------
+    return 0.0;
+  }
+  char ops[16] = {'p','c','s','o','t','S','C','T','L','l','^','!','/', '*', '-', '+'};//-------------------------
+  double nums[30] = {0};
+  char symbols[30];
+  
+
+  int numCount = 0, symCount = 0;
+  String num = "";
+
+  // Parse the expression
+  for (int i = 0; i < exp.length(); i++) {
+    char ch = exp[i];
+    if (isDigit(ch) || ch == '.') {//-------------
+      num += ch;
+    } else {
+      nums[numCount++] = num.toDouble();
+      num = "";
+      symbols[symCount++] = ch;
+    }
+  }
+  // Push the last number if any
+  if (num.length() > 0) {
+    nums[numCount++] = num.toDouble();
+  }
+
+  // Perform operations in order of precedence: /, *, +, -
+  for (int opIndex = 0; opIndex < 16; opIndex++) {
+    int i = 0;
+    while (i < symCount) {
+      if (symbols[i] == ops[opIndex]) {
+        double result = 0;
+        switch (ops[opIndex]) {
+          case '/': result = nums[i] / nums[i + 1]; break;
+          case '*': result = nums[i] * nums[i + 1]; break;
+          case '+': result = nums[i] + nums[i + 1]; break;
+          case '-': result = nums[i] - nums[i + 1]; break;
+          case '!': result = factorial(nums[i]) + nums[i+1];break;
+          case '^': result = pow(nums[i],nums[i+1]);break;//--------------------
+          case 'S': result = (nums[i]==0?sin((radian_state==true?nums[i+1]:radians(nums[i+1]))):nums[i]*sin((radian_state==true?nums[i+1]:radians(nums[i+1]))));break;
+          // if(nums[i]==0)result = sin(nums[i+1]);
+          // else result = nums[i]*sin(nums[i+1]);
+          case 'C': result = (nums[i]==0?cos((radian_state==true?nums[i+1]:radians(nums[i+1]))):nums[i]*cos((radian_state==true?nums[i+1]:radians(nums[i+1]))));break;
+          case 'T': result = (nums[i]==0?tan((radian_state==true?nums[i+1]:radians(nums[i+1]))):nums[i]*tan((radian_state==true?nums[i+1]:radians(nums[i+1]))));break;
+          case 'l': result = (nums[i]==0?log(nums[i+1]):nums[i]*log(nums[i+1]));break;
+          case 'L': result = (nums[i]==0?log10(nums[i+1]):nums[i]*log10(nums[i+1]));break;
+          case 'p': result = permutation(nums[i],nums[i+1]);break;
+          case 'c': result = combinations(nums[i],nums[i+1]);break;
+          case 's': result = (nums[i]==0?asin((radian_state==true?nums[i+1]:radians(nums[i+1]))):nums[i]*asin((radian_state==true?nums[i+1]:radians(nums[i+1]))));break;
+          case 'o': result = (nums[i]==0?acos((radian_state==true?nums[i+1]:radians(nums[i+1]))):nums[i]*acos((radian_state==true?nums[i+1]:radians(nums[i+1]))));break;
+          case 't': result = (nums[i]==0?atan((radian_state==true?nums[i+1]:radians(nums[i+1]))):nums[i]*atan((radian_state==true?nums[i+1]:radians(nums[i+1]))));break;
+        }
+
+        // Replace nums[i] with result and shift others
+        nums[i] = result;
+        for (int j = i + 1; j < numCount - 1; j++) {
+          nums[j] = nums[j + 1];
+        }
+        numCount--;
+
+        // Remove the used operator
+        for (int j = i; j < symCount - 1; j++) {
+          symbols[j] = symbols[j + 1];
+        }
+        symCount--;
+        // Stay at same index to recheck current position
+      } else {
+        i++;
+      }
+    }
+  }
+  if(isnan(nums[0]))error_occured = true;//eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+  answer = nums[0];//----------------------
+  return nums[0];
+}
+
+double factorial(double number)
+{
+  double result = 1;
+  if(number <= 0)return 1.0;
+  for(int i = 1;i<=number;i++)
+  {
+      result *= i;
+  }
+  return result;
+}
+
+String removeBrackets(String exp) {
+  while (exp.indexOf('(') != -1) {
+    int close = exp.indexOf(')');
+    int open = close;
+    while (open >= 0 && exp[open] != '(') open--;
+    if (open < 0) break; // Invalid bracket
+
+    String inner = exp.substring(open + 1, close);
+    double innerResult = evaluateExpression(inner); // Recursive call
+    
+    bool leftIsDigit = (open > 0) && isDigit(exp[open - 1]);
+    bool rightIsDigit = (close + 1 < exp.length()) && isDigit(exp[close + 1]);
+    bool IsTrig = (open > 0) && isSinCosTanLog(exp[open - 1]);//-------------------------
+    if(IsTrig && innerResult<0)
+    {
+      //----------
+      double result = 0;
+      switch(exp[open - 1]){
+        case 'S':result = sin(radian_state==true?innerResult:radians(innerResult));break;
+        case 'C':result = cos(radian_state==true?innerResult:radians(innerResult));break;
+        case 'T':result = tan(radian_state==true?innerResult:radians(innerResult));break;
+        case 'L':result = log10(innerResult);break;
+        case 'l':result = log(innerResult);break;
+        case 's':result = asin(radian_state==true?innerResult:radians(innerResult));break;
+        case 'o':result = acos(radian_state==true?innerResult:radians(innerResult));break;
+        case 't':result = atan(radian_state==true?innerResult:radians(innerResult));break;
+      }
+      if(isnan(result))
+      {
+        error_occured = true;//eeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+        return exp;
+      }
+      open = open-1;
+      leftIsDigit = (open > 0) && isDigit(exp[open - 1]);
+      rightIsDigit = (close + 1 < exp.length()) && isDigit(exp[close + 1]);
+      innerResult = result;
+      
+    }//------------------------------------------------
+if (leftIsDigit && rightIsDigit) {
+  exp = exp.substring(0, open) + "*" + String(innerResult) + "*" + exp.substring(close + 1);
+} else if (leftIsDigit) {
+  exp = exp.substring(0, open) + "*" + String(innerResult) + exp.substring(close + 1);
+} else if (rightIsDigit) {
+  exp = exp.substring(0, open) + String(innerResult) + "*" + exp.substring(close + 1);
+} else {
+  exp = exp.substring(0, open) + String(innerResult) + exp.substring(close + 1);
+}
+  }
+  
+  return exp;}
+ 
+String remove_extra_bracket(String exp) {
+  char brackets[3] = {'[','{','('};
+  char ends[3] = {']','}',')'};
+  for(int a = 0;a < 3;a++)
+  {  
+    for (int i = 1; i < exp.length(); i++) {
+      if (isDigit(exp[i - 1]) && exp[i] == brackets[a]) {
+        exp = exp.substring(0, i) + "*" + exp.substring(i+1);
+        i++; // Skip the '*' we just inserted
+      } else if (exp[i - 1] == ends[a] && isDigit(exp[i])) {
+        exp = exp.substring(0, i-1) + "*" + exp.substring(i);
+        i++; // Skip the '*' we just inserted
+      }
+    }
+  }
+    return exp;
+}
+
+bool isSinCosTanLog(char ch)
+{
+  if(ch == 'S'||ch == 'C'||ch == 'T'||ch == 'L'||ch == 'l'||ch == 's'||ch == 'o'||ch == 't')return true;
+}
+
+
+String removeBrackets_2(String exp) {
+  while (exp.indexOf('[') != -1) {
+    int close = exp.indexOf(']');
+    int open = close;
+    while (open >= 0 && exp[open] != '[') open--;
+    if (open < 0) break; // Invalid bracket
+
+    String inner = exp.substring(open + 1, close);
+    double innerResult = evaluateExpression(inner); // Recursive call
+    
+    bool leftIsDigit = (open > 0) && isDigit(exp[open - 1]);
+    bool rightIsDigit = (close + 1 < exp.length()) && isDigit(exp[close + 1]);
+    bool IsTrig = (open > 0) && isSinCosTanLog(exp[open - 1]);//-------------------------
+    if(IsTrig && innerResult<0)
+    {
+      //----------
+      double result = 0;
+      switch(exp[open - 1]){
+        case 'S':result = sin(radian_state==true?innerResult:radians(innerResult));break;
+        case 'C':result = cos(radian_state==true?innerResult:radians(innerResult));break;
+        case 'T':result = tan(radian_state==true?innerResult:radians(innerResult));break;
+        case 'L':result = log10(innerResult);break;
+        case 'l':result = log(innerResult);break;
+        case 's':result = asin(radian_state==true?innerResult:radians(innerResult));break;
+        case 'o':result = acos(radian_state==true?innerResult:radians(innerResult));break;
+        case 't':result = atan(radian_state==true?innerResult:radians(innerResult));break;
+      }
+      if(isnan(result))
+      {
+        error_occured = true;//eeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+        return exp;
+      }
+      open = open-1;
+      leftIsDigit = (open > 0) && isDigit(exp[open - 1]);
+      rightIsDigit = (close + 1 < exp.length()) && isDigit(exp[close + 1]);
+      innerResult = result;
+      
+    }//------------------------------------------------
+if (leftIsDigit && rightIsDigit) {
+  exp = exp.substring(0, open) + "*" + String(innerResult) + "*" + exp.substring(close + 1);
+} else if (leftIsDigit) {
+  exp = exp.substring(0, open) + "*" + String(innerResult) + exp.substring(close + 1);
+} else if (rightIsDigit) {
+  exp = exp.substring(0, open) + String(innerResult) + "*" + exp.substring(close + 1);
+} else {
+  exp = exp.substring(0, open) + String(innerResult) + exp.substring(close + 1);
+}
+  }
+  
+  return exp;}
+
+
+String removeBrackets_1(String exp) {
+  while (exp.indexOf('{') != -1) {
+    int close = exp.indexOf('}');
+    int open = close;
+    while (open >= 0 && exp[open] != '{') open--;
+    if (open < 0) break; // Invalid bracket
+
+    String inner = exp.substring(open + 1, close);
+    double innerResult = evaluateExpression(inner); // Recursive call
+    
+    bool leftIsDigit = (open > 0) && isDigit(exp[open - 1]);
+    bool rightIsDigit = (close + 1 < exp.length()) && isDigit(exp[close + 1]);
+    bool IsTrig = (open > 0) && isSinCosTanLog(exp[open - 1]);//-------------------------
+    if(IsTrig && innerResult<0)
+    {
+      //----------
+      double result = 0;
+      switch(exp[open - 1]){
+        case 'S':result = sin(radian_state==true?innerResult:radians(innerResult));break;
+        case 'C':result = cos(radian_state==true?innerResult:radians(innerResult));break;
+        case 'T':result = tan(radian_state==true?innerResult:radians(innerResult));break;
+        case 'L':result = log10(innerResult);break;
+        case 'l':result = log(innerResult);break;
+        case 's':result = asin(radian_state==true?innerResult:radians(innerResult));break;
+        case 'o':result = acos(radian_state==true?innerResult:radians(innerResult));break;
+        case 't':result = atan(radian_state==true?innerResult:radians(innerResult));break;
+      }
+      if(isnan(result))
+      {
+        error_occured = true;//eeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+        return exp;
+      }
+      open = open-1;
+      leftIsDigit = (open > 0) && isDigit(exp[open - 1]);
+      rightIsDigit = (close + 1 < exp.length()) && isDigit(exp[close + 1]);
+      innerResult = result;
+      
+    }//------------------------------------------------
+if (leftIsDigit && rightIsDigit) {
+  exp = exp.substring(0, open) + "*" + String(innerResult) + "*" + exp.substring(close + 1);
+} else if (leftIsDigit) {
+  exp = exp.substring(0, open) + "*" + String(innerResult) + exp.substring(close + 1);
+} else if (rightIsDigit) {
+  exp = exp.substring(0, open) + String(innerResult) + "*" + exp.substring(close + 1);
+} else {
+  exp = exp.substring(0, open) + String(innerResult) + exp.substring(close + 1);
+}
+  }
+  
+  return exp;}
+
+
+bool is_Matrix_entered(String exps,int *op,int *clo)
+{
+  String exp = exps;
+  while(exp.indexOf('[')!=-1)
+  {
+    int open = exp.indexOf('[');
+    bool entered = exp[open+1] == '{' && exp[open+2] == '(';
+    int close = exp.indexOf(']');
+    bool exited = exp[close-1] == '}' && exp[close-2] == ')';
+    if(entered && exited && close > open)
+    {
+      *op = open;
+      *clo = close;
+      return true;
+    }
+  }
+  return false;
+}
+
+String Matrix_taker(String exp)
+{
+  String cols[] = {""};
+  int col=0,row=0,num[] = {0};
+  int open=0,close=exp.length();
+  while(open < exp.length())
+  {
+    if(is_Matrix_entered(exp.substring(open),&open,&close))
+    {
+      for(int i = open+2;i < close-1;i++)
+      {
+        if(exp[i]!=')'||exp[i]!='('||exp[i]!='{'||exp[i]!='}')cols[col] += exp[i];
+        else if(exp[i]==')')cols[col] += ' ';
+        else if(exp[i]=='}')col++;
+        else if(exp[i]=='{')row++;
+        else if(exp[i]=='(')num[row]++;
+      }
+
+    }
+  }
+}
+
+String Matrix_solver(String exps)
+{
+  
+  
+}
+
+
+
+
+
+// String Matrix_solver(String exps)
+// {  
+//    String exp = exps;
+//    int matrix_column = 1;
+//    if(isMatrix_entered(exp));//pending
+//    while (exp.indexOf('{') != -1) {
+//     int close = exp.indexOf('}');
+//     int open = close;
+//     while (open >= 0 && exp[open] != '{') open--;
+//     if (open < 0)
+//     {
+//       matrix_error_state = true;
+//       return;
+//     } // Invalid bracket
+//      if(!isDigit(exp[open+1])||!isDigit(exp[close-1]))
+//        {
+//          matrix_error_state = true;
+//            return;
+//          }
+//      for(int i = open;i < close;i++)
+//        {
+//          if(exp[i]==' ')
+//            {
+//              matrix_column++;
+//              while(exp[])
+//              }
+//          }
+//     String inner = exp.substring(open + 1, close);
+//     double innerResult = evaluateExpression(inner); // Recursive call
+    
+//     bool leftIsDigit = (open > 0) && isDigit(exp[open - 1]);
+//     bool rightIsDigit = (close + 1 < exp.length()) && isDigit(exp[close + 1]);
+//     bool IsTrig = (open > 0) && isSinCosTanLog(exp[open - 1]);//-------------------------
+//     if(IsTrig && innerResult<0)
+//     {
+//       //----------
+//       double result = 0;
+//       switch(exp[open - 1]){
+//         case 'S':result = sin(radian_state==true?innerResult:radians(innerResult));break;
+//         case 'C':result = cos(radian_state==true?innerResult:radians(innerResult));break;
+//         case 'T':result = tan(radian_state==true?innerResult:radians(innerResult));break;
+//         case 'L':result = log10(innerResult);break;
+//         case 'l':result = log(innerResult);break;
+//       }
+//       if(isnan(result))
+//       {
+//         error_occured = true;//eeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+//         return exp;
+//       }
+//       open = open-1;
+//       leftIsDigit = (open > 0) && isDigit(exp[open - 1]);
+//       rightIsDigit = (close + 1 < exp.length()) && isDigit(exp[close + 1]);
+//       innerResult = result;
+      
+//     }//------------------------------------------------
+// if (leftIsDigit && rightIsDigit) {
+//   exp = exp.substring(0, open) + "*" + String(innerResult) + "*" + exp.substring(close + 1);
+// } else if (leftIsDigit) {
+//   exp = exp.substring(0, open) + "*" + String(innerResult) + exp.substring(close + 1);
+// } else if (rightIsDigit) {
+//   exp = exp.substring(0, open) + String(innerResult) + "*" + exp.substring(close + 1);
+// } else {
+//   exp = exp.substring(0, open) + String(innerResult) + exp.substring(close + 1);
+// }
+//   }
+//   return exp;
+// }
+
+// String differentiation(String exp)
+// {
+  
+// }
+
+String remove_constant(String exp)
+{
+  char symbol[4] = {'y','A','P','e'};
+  for(int j = 0;j < 4;j++)
+  {
+      if(exp.indexOf(symbol[j])!=-1)
+    {
+      double result=0;
+      int i = exp.indexOf(symbol[j]);
+      bool isleftDigit = (i > 0) && (isDigit(exp[i-1]));
+      bool isRightDigit = (i+1 < exp.length()) && (isDigit(exp[i+1]));
+      if(symbol[j]=='A')result = answer;
+      else if(symbol[j]=='P')result = PI;
+      else if(symbol[j]=='e')result = 2.71828;
+      else if(symbol[j]=='y')result = random(1000);
+      if(isleftDigit && isRightDigit)
+      {
+        exp = exp.substring(0,i) + "*" + String(result) + "*" + exp.substring(i+1);
+      }
+      else if(isleftDigit)
+      {
+        exp = exp.substring(0,i) + "*" + String(result) + exp.substring(i+1);
+      }
+      else if(isRightDigit)
+      {
+        exp = exp.substring(0,i) + String(result) + "*" + exp.substring(i+1);
+      }
+      else
+      {
+        exp = exp.substring(0,i) + String(result) + exp.substring(i+1);
+      }
+    }
+  }
+ 
+  return exp;
+}
+
+double permutation(int n,int r)
+{
+  double result = (factorial(n))/(factorial(n-r));
+  return result;
+}
+double combinations(int n,int r)
+{
+  double result = permutation(n,r);
+  result = result/factorial(r);
+  return result;
+}
+
